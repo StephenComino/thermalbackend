@@ -3,6 +3,7 @@ from flask import Response
 from flask import request
 from flask import jsonify
 from test import ThermalCamera
+from depthcam import getDepthData, getCameraView
 from gevent import monkey
 import numpy as np
 from numpyencoder import NumpyEncoder
@@ -22,11 +23,15 @@ cam = ThermalCamera()
 def index():
   return "<html><body><h1>I Love my Darling Stephanie</h1></body></html>"
 
-@app.route("/video_stream")
+@app.route("/video_stream", methods=['GET'])
 def video_stream():
-
-    return Response(cam.cameraCapture(),
-    mimetype = "multipart/x-mixed-replace; boundary=frame")
+    type_stream = request.args.getlist('type', type=int)
+    if type_stream[0] == 1:
+        return Response(getCameraView(),
+        mimetype = "multipart/x-mixed-replace; boundary=frame")
+    elif type_stream[0] == 0:
+        return Response(cam.cameraCapture(),
+        mimetype = "multipart/x-mixed-replace; boundary=frame")
 
 @app.route("/reset", methods = ['GET'])
 def get_reset():
@@ -36,6 +41,39 @@ def get_reset():
             statusCode= 200,
             data= "Ok"), 200
 
+@app.route("/distanceAt", methods=['GET'])
+def get_distance():
+    min_x_pixel = request.args.getlist('x', type=float)
+    min_y_pixel = request.args.getlist('y', type=float)
+    
+    new_contour_array = []
+    for i,d in enumerate(min_x_pixel):
+        arr = []
+        arr.append(min_x_pixel[i])
+        arr.append(min_y_pixel[i])
+        new_contour_array.append(arr) 
+    original_length = len(min_x_pixel)
+    contours = np.array(new_contour_array, dtype=np.int32)
+    
+    mask = np.zeros(data.shape, np.uint16)
+    cv2.drawContours(mask, [contours], -1, 255, -1)
+    points = []
+    for x in range(640):
+        for y in range(480):
+            result = cv2.pointPolygonTest(contours, (idx_x,idx_y), False)
+            if result == 1 or result == 0:
+                points.append((x, y))
+                
+    data = getDepthData(points)
+    
+    return jsonify(isError= False,
+                message= "Success",
+                statusCode= 200,
+                data= [data]), 200
+    
+    ## Need to resize and at the moment these are wrong
+    #min_x_pixel = [(min_x // 2.34375) for min_x in min_x_pixel]
+    #min_y_pixel = [(min_y // 2.5) for min_y in min_y_pixel]
 # Test if this function highlights the correct area on the screen
 # Draw the path on the 160x120 image
 
