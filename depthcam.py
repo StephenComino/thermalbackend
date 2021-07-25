@@ -9,8 +9,33 @@
 import pyrealsense2.pyrealsense2 as rs
 import numpy as np
 import cv2
-    # C
+class DepthCamera():
+    
+    # Get the data of the camera
+    self.pipeline = rs.pipeline()
+    self.config = rs.config()
+    self.pipeline_wrapper = rs.pipeline_wrapper(self.pipeline)
+    self.pipeline_profile = self.config.resolve(self.pipeline_wrapper)
+    self.device = self.pipeline_profile.get_device()
+    self.device_product_line = str(self.sdevice.get_info(rs.camera_info.product_line))
+    
+    # Enable the streams we are interested in
+    self.config.enable_stream(rs.stream.depth, 640, 480, rs.format.z16, 30)
+    self.config.enable_stream(rs.stream.color, 640, 480, rs.format.bgr8, 30)
+    
+    self.pipeline.start(self.config)
+    
+    # Get the RGB frame
+    def getRGBFrame(self):
+        frames = pipeline.wait_for_frames()
+        return frames
+    
+    # Get the Depth Frame
+    def getDepthFrame(self):
+        depth_frame = frames.get_depth_frame()
+        return depth_frame
     # Configure depth and color streams
+    
 def getDepthData(list_points):
     pipeline = rs.pipeline()
     config = rs.config()
@@ -53,6 +78,7 @@ def getDepthData(list_points):
     
     
     return average
+
 def getCameraView():
     pipeline = rs.pipeline()
     config = rs.config()

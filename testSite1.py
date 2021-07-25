@@ -43,6 +43,7 @@ def get_reset():
 
 @app.route("/distanceAt", methods=['GET'])
 def get_distance():
+    # Get the pixels drawn
     min_x_pixel = request.args.getlist('x', type=float)
     min_y_pixel = request.args.getlist('y', type=float)
     
@@ -54,7 +55,7 @@ def get_distance():
         new_contour_array.append(arr) 
     original_length = len(min_x_pixel)
     contours = np.array(new_contour_array, dtype=np.int32)
-    
+    data = getDepthData(new_contour_array)
     mask = np.zeros(data.shape, np.uint16)
     cv2.drawContours(mask, [contours], -1, 255, -1)
     points = []
@@ -64,7 +65,7 @@ def get_distance():
             if result == 1 or result == 0:
                 points.append((x, y))
                 
-    data = getDepthData(points)
+    #data = getDepthData(points)
     
     return jsonify(isError= False,
                 message= "Success",
