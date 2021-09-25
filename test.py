@@ -27,6 +27,28 @@ class ThermalCamera():
         GPIO.output(40, 0)       # set an output port/pin value to 0/LOW/Fa
         time.sleep(2)
         GPIO.output(40,1)
+    
+    def takeThermalImage(self):
+        i = 0
+        while i < 5:
+            with Lepton3() as l:
+              a,b = l.capture()
+              minimum = a[a>0].min()
+              minimum_temp = (minimum * 0.01) - 273.15
+              maximum = a[a>0].max()
+              maximum_temp = (maximum * 0.01) - 273.15
+              #if maximum_temp > 300:
+              #    return
+            i += 1
+        #cv2.normalize(a, a, 0, 65535, cv2.NORM_MINMAX) # extend contrast
+        #np.right_shift(a, 8, a)
+        #gray_image = cv2.cvtColor(a, cv2.COLOR_BGR2GRAY)
+        #gray_image = np.array(gray_image)
+        #gray_image.convertTo(gray_image, CV_8UC3, 255.0); 
+        path = '/home/pi/Desktop/test_therm.png'
+        #frame_normed = 255 * (color_image - color_image.min()) / (color_image.max() - color_image.min())
+        #frame_normed = np.array(frame_normed, np.int)
+        cv2.imwrite(path, 255*a)
     def cameraCapture(self):
         while True:
             with Lepton3() as l:

@@ -9,109 +9,78 @@
 import pyrealsense2.pyrealsense2 as rs
 import numpy as np
 import cv2
+from PIL import Image
+import time
+from threading import Thread
+
 class DepthCamera():
+    def __init__(self):
+        # Get the data of the camera
+        self.pipeline = rs.pipeline()
+        self.config = rs.config()
+        self.pipeline_wrapper = rs.pipeline_wrapper(self.pipeline)
+        self.pipeline_profile = self.config.resolve(self.pipeline_wrapper)
+        self.device = self.pipeline_profile.get_device()
+        #self.device_product_line = str(self.device.get_info(rs.camera_info.product_line))
+        
+        # Enable the streams we are interested in
+        self.config.enable_stream(rs.stream.depth, 640, 480, rs.format.z16, 30)
+        self.config.enable_stream(rs.stream.color, 640, 480, rs.format.bgr8, 30)
+        
+        
+        
+        self.pipeline.start(self.config)
+        self.frames = None
+        self.Depth_Image = 0
+        self.average = 0
     
-    # Get the data of the camera
-    self.pipeline = rs.pipeline()
-    self.config = rs.config()
-    self.pipeline_wrapper = rs.pipeline_wrapper(self.pipeline)
-    self.pipeline_profile = self.config.resolve(self.pipeline_wrapper)
-    self.device = self.pipeline_profile.get_device()
-    self.device_product_line = str(self.sdevice.get_info(rs.camera_info.product_line))
-    
-    # Enable the streams we are interested in
-    self.config.enable_stream(rs.stream.depth, 640, 480, rs.format.z16, 30)
-    self.config.enable_stream(rs.stream.color, 640, 480, rs.format.bgr8, 30)
-    
-    self.pipeline.start(self.config)
-    
+    # Get Frame
+    def getFrame(self):
+        frames = self.pipeline.wait_for_frames()
+        return frames
     # Get the RGB frame
     def getRGBFrame(self):
-        frames = pipeline.wait_for_frames()
+        frames = self.frames.get_color_frame()
         return frames
     
     # Get the Depth Frame
-    def getDepthFrame(self):
+    def getDepthFrame(self, frames):
         depth_frame = frames.get_depth_frame()
         return depth_frame
-    # Configure depth and color streams
+    # Configure depth and color streaamems
     
-def getDepthData(list_points):
-    pipeline = rs.pipeline()
-    config = rs.config()
-
-    # Get device product line for setting a supporting resolution
-    pipeline_wrapper = rs.pipeline_wrapper(pipeline)
-    pipeline_profile = config.resolve(pipeline_wrapper)
-    device = pipeline_profile.get_device()
-    device_product_line = str(device.get_info(rs.camera_info.product_line))
-
-    found_rgb = False
-    for s in device.sensors:
-        if s.get_info(rs.camera_info.name) == 'RGB Camera':
-            found_rgb = True
-            break
-    if not found_rgb:
-        print("The demo requires Depth camera with Color sensor")
-        exit(0)
-    config.enable_stream(rs.stream.depth, 640, 480, rs.format.z16, 30)
-
-    
-    config.enable_stream(rs.stream.color, 640, 480, rs.format.bgr8, 30)
-
-    # Start streaming
-    pipeline.start(config)
-    #while True:
-
-    # Wait for a coherent pair of frames: depth and color
-    frames = pipeline.wait_for_frames()
-    depth_frame = frames.get_depth_frame()
-    
-    ## Get average of a set of pixels
-    average = 0.0
-    total = 0
-    for items in list_points:
-        total += depth_frame.get_distance(items[0], items[1])
+    def getDepthData(self, image_points):
         
-    average = total / len(list_points)
-    #distance = depth_frame.get_distance(320, 240)
-    
-    
-    return average
+        self.frames = self.getFrame()
+        depth_frame = self.getDepthFrame(self.frames)
+        #olor_frame = self.getRGBFrame()
+        
+        if not depth_frame:
+            return
 
-def getCameraView():
-    pipeline = rs.pipeline()
-    config = rs.config()
+        # Convert images to numpy arrays
+        depth_image = np.asanyarray(depth_frame.get_data())
+        #color_image = np.asanyarray(color_frame.get_data())
+        #dim = (160, 120)
+        distance_data = []
+        for i, tu in enumerate(image_points):
+            distance_data.append(depth_frame.get_distance(tu[0], tu[1]))
+        # resize image
+        #resized = cv2.resize(depth_image, dim, interpolation = cv2.INTER_AREA)
+        
+        # Get the depth values I am interested in and return them
+        
+        
+        
+        return distance_data
 
-    # Get device product line for setting a supporting resolution
-    pipeline_wrapper = rs.pipeline_wrapper(pipeline)
-    pipeline_profile = config.resolve(pipeline_wrapper)
-    device = pipeline_profile.get_device()
-    device_product_line = str(device.get_info(rs.camera_info.product_line))
-
-    found_rgb = False
-    for s in device.sensors:
-        if s.get_info(rs.camera_info.name) == 'RGB Camera':
-            found_rgb = True
-            break
-    if not found_rgb:
-        print("The demo requires Depth camera with Color sensor")
-        exit(0)
-    config.enable_stream(rs.stream.depth, 640, 480, rs.format.z16, 30)
-
-    
-    config.enable_stream(rs.stream.color, 640, 480, rs.format.bgr8, 30)
-
-    # Start streaming
-    pipeline.start(config)
-    while True:
-
-        # Wait for a coherent pair of frames: depth and color
-        frames = pipeline.wait_for_frames()
-        depth_frame = frames.get_depth_frame()
-        color_frame = frames.get_color_frame()
+    def captureAndSaveImage(self):
+        self.frames = self.getFrame()
+        depth_frame = self.getDepthFrame(self.frames)
+        color_frame = self.getRGBFrame()
+        
         if not depth_frame or not color_frame:
-            continue
+            return
 
         # Convert images to numpy arrays
         depth_image = np.asanyarray(depth_frame.get_data())
@@ -119,14 +88,42 @@ def getCameraView():
 
         # Apply colormap on depth image (image must be converted to 8-bit per pixel first)
         gray_image = cv2.cvtColor(color_image, cv2.COLOR_BGR2GRAY)
+        #gray_image = np.array(gray_image)
+        #gray_image.convertTo(gray_image, CV_8UC3, 255.0); 
+        path = '/home/pi/Desktop/test.png'
+        #frame_normed = 255 * (color_image - color_image.min()) / (color_image.max() - color_image.min())
+        #frame_normed = np.array(frame_normed, np.int)
+        cv2.imwrite(path, 55*gray_image)
         
-        # Get Distance when circle around things and the intel realsense camera is chosen
+    def getCameraView(self):
+        while True:
+            # Wait for a coherent pair of frames: depth and color
+            self.frames = self.getFrame()
+            depth_frame = self.getDepthFrame(self.frames)
+            color_frame = self.getRGBFrame()
             
-        (flag, encodedImage) = cv2.imencode(".jpg", gray_image)
-        # Show images
-        yield (b'--frame\r\n' b'Content-Type: image/jpeg\r\n\r\n' + 
-                bytearray(encodedImage) + b'\r\n')
-        #cv2.namedWindow('RealSense', cv2.WINDOW_AUTOSIZE)
-        #cv2.imshow('RealSense', images)
-        #cv2.waitKey(1)
+            if not depth_frame or not color_frame:
+                continue
+
+            # Convert images to numpy arrays
+            depth_image = np.asanyarray(depth_frame.get_data())
+            color_image = np.asanyarray(color_frame.get_data())
+            
+            dim = (160, 120)
+ 
+            # resize image
+            resized = cv2.resize(depth_image, dim, interpolation = cv2.INTER_AREA)
+            # Apply colormap on depth image (image must be converted to 8-bit per pixel first)
+            #gray_image = cv2.cvtColor(resized, cv2.COLOR_BGR2GRAY)
+            
+            #yield result
+            # Get Distance when circle around things and the intel realsense camera is chosen
+                
+            (flag, encodedImage) = cv2.imencode(".jpg", gray_image)
+            # Show images
+            yield (b'--frame\r\n' b'Content-Type: image/jpeg\r\n\r\n' + 
+                    bytearray(encodedImage) + b'\r\n')
+            #cv2.namedWindow('RealSense', cv2.WINDOW_AUTOSIZE)
+            #cv2.imshow('RealSense', images)
+            #cv2.waitKey(1)
 
